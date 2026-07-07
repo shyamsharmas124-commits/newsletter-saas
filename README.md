@@ -1,7 +1,8 @@
-![API Status](https://img.shields.io/website?url=https://newsletter-saas-api.onrender.com/api/health)
 # Newsletter SaaS — Backend API
 
 A multi-tenant newsletter platform backend built with Node.js, Express, and MongoDB. Features JWT authentication with refresh token rotation, role-based access control (RBAC), and a payment verification flow.
+
+**Live API:** https://newsletter-saas-api.onrender.com
 
 ---
 
@@ -11,7 +12,7 @@ A multi-tenant newsletter platform backend built with Node.js, Express, and Mong
 - **Framework:** Express.js
 - **Database:** MongoDB + Mongoose
 - **Auth:** JWT (access + refresh tokens), bcryptjs
-- **Payment:** Razorpay with HMAC-SHA256 signature verification
+- **Payment:** Mock payment gateway with HMAC-SHA256 signature verification
 
 ---
 
@@ -32,38 +33,59 @@ Payment verification uses HMAC-SHA256 signing — the server generates a signatu
 ---
 
 ## Project Structure
-
-```text
-.
-├── config/
-│   └── db.js                 MongoDB connection
-├── controllers/
-│   ├── authController.js     Signup, login, refresh, logout
-│   ├── orgController.js      Org CRUD, member management
-│   └── billingController.js  Order creation, payment verification
-├── middleware/
-│   ├── requireAuth.js        JWT access token verification
-│   └── requireRole.js        RBAC role checking per org
-├── models/
-│   ├── User.js
-│   ├── Organization.js       Tenant model
-│   └── Membership.js         User ↔ Org join with role
-├── routes/
-│   ├── authRoutes.js
-│   ├── orgRoutes.js
-│   └── billingRoutes.js
-├── utils/
-│   ├── tokens.js             JWT generation and verification
-│   └── cookies.js            Refresh token cookie management
-└── server.js
 ```
 
+server/
 
+├── config/
+
+│   └── db.js                 MongoDB connection
+
+├── controllers/
+
+│   ├── authController.js     Signup, login, refresh, logout
+
+│   ├── orgController.js      Org CRUD, member management
+
+│   └── billingController.js  Order creation, payment verification
+
+├── middleware/
+
+│   ├── requireAuth.js        JWT access token verification
+
+│   └── requireRole.js        RBAC role checking per org
+
+├── models/
+
+│   ├── User.js
+
+│   ├── Organization.js       Tenant model
+
+│   └── Membership.js         User ↔ Org join with role
+
+├── routes/
+
+│   ├── authRoutes.js
+
+│   ├── orgRoutes.js
+
+│   └── billingRoutes.js
+
+├── utils/
+
+│   ├── tokens.js             JWT generation and verification
+
+│   └── cookies.js            Refresh token cookie management
+
+└── server.js
+
+```
 ---
 
 ## API Reference
 
 ### Auth
+
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
 | POST | `/api/auth/signup` | Register a new user | None |
@@ -73,17 +95,19 @@ Payment verification uses HMAC-SHA256 signing — the server generates a signatu
 | GET | `/api/auth/me` | Get current user | Bearer |
 
 ### Organizations
+
 | Method | Endpoint | Description | Min Role |
 |--------|----------|-------------|----------|
 | POST | `/api/organizations` | Create organization | Logged in |
 | GET | `/api/organizations/mine` | List my organizations | Logged in |
 | GET | `/api/organizations/:orgId` | Get organization | Subscriber |
 | GET | `/api/organizations/:orgId/members` | List members | Subscriber |
-| POST | `/api/organizations/:orgId/invites` | Invite a member | Editor |
+| POST | `/api/organizations/:orgId/invite` | Invite a member | Editor |
 | PATCH | `/api/organizations/:orgId/members/:userId/role` | Change member role | Owner |
 | DELETE | `/api/organizations/:orgId/members/:userId` | Remove member | Owner |
 
 ### Billing
+
 | Method | Endpoint | Description | Min Role |
 |--------|----------|-------------|----------|
 | POST | `/api/billing/:orgId/create-order` | Create payment order | Owner |
@@ -93,50 +117,153 @@ Payment verification uses HMAC-SHA256 signing — the server generates a signatu
 
 ---
 
+## Testing with Postman
+
+### Setup
+
+1. Open Postman and create a new Environment called `newsletter-dev`
+2. Add a variable called `token` with an empty value
+3. Select `newsletter-dev` as your active environment from the top right dropdown
+4. For every protected request, add this header:
+	- Key: `Authorization`
+	- Value: `Bearer {{token}}`
+
+### Step 1 — Signup
+```
+
+POST /api/auth/signup
+
+Body: { "name": "Test User", "email": "[test@example.com](mailto:test@example.com)", "password": "password123" }
+
+```
+Expected: `201` with `accessToken` and user object.
+
+### Step 2 — Save token
+
+Copy the `accessToken` from the response → paste it as the `Current Value` of `token` in your `newsletter-dev` environment.
+
+### Step 3 — Create an organization
+```
+
+POST /api/organizations
+
+Headers: Authorization: Bearer {{token}}
+
+Body: { "name": "My Newsletter", "slug": "my-newsletter" }
+
+```
+Expected: `201` with org object. Copy the `_id` — this is your `orgId`.
+
+### Step 4 — Create a payment order
+```
+
+POST /api/billing/:orgId/create-order
+
+Headers: Authorization: Bearer {{token}}
+
+```
+Expected: `200` with `orderId`, `amount`, `currency`, and `signature`. Copy `orderId` and `signature`.
+
+### Step 5 — Verify payment
+```
+
+POST /api/billing/:orgId/verify-payment
+
+Headers: Authorization: Bearer {{token}}
+
+Body: {
+
+"order_id": "<orderId from step 4>",
+
+"payment_id": "pay_mock_test123",
+
+"signature": "<signature from step 4>"
+
+}
+
+```
+Expected: `200` with `Payment verified and subscription activated`.
+
+### Step 6 — Check subscription status
+```
+
+GET /api/billing/:orgId/status
+
+Headers: Authorization: Bearer {{token}}
+
+```
+Expected: `{ "subscriptionStatus": "active", "hasActiveSubscription": true }`
+
+### Step 7 — Test tampered signature (security check)
+
+Repeat Step 5 with a modified signature — any character changed. Expected: `400 Invalid payment signature`. This confirms server-side verification is working.
+
+### Step 8 — Cancel subscription
+```
+
+POST /api/billing/:orgId/cancel
+
+Headers: Authorization: Bearer {{token}}
+
+```
+Expected: `200` with `Subscription cancelled`.
+
+### Step 9 — Confirm cancellation
+
+Repeat Step 6. Expected: `{ "subscriptionStatus": "canceled", "hasActiveSubscription": false }`
+
+---
+
 ## Local Setup
 
-1. Clone and install
+**1. Clone and install**
 
 ```bash
-git clone https://github.com/yourusername/newsletter-saas.git
+git clone https://github.com/shyamsharmas124-commits/newsletter-saas.git
 cd newsletter-saas/server
 npm install
 ```
 
-2. Environment variables
+**2. Environment variables**
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in the following in `.env`:
-
-```env
-PORT=5000
-MONGO_URI=your_mongodb_atlas_uri
-JWT_ACCESS_SECRET=run: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-JWT_REFRESH_SECRET=run the same command again and keep the value different
-JWT_ACCESS_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=7d
-CLIENT_URL=http://localhost:5173
-RAZORPAY_KEY_ID=your_razorpay_key_id
-RAZORPAY_KEY_SECRET=your_razorpay_key_secret
-NODE_ENV=development
+Fill in `.env`:
 ```
 
-3. Start the server
+PORT=5000
+
+MONGO_URI=your_mongodb_atlas_uri
+
+JWT_ACCESS_SECRET=generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+JWT_REFRESH_SECRET=run above again with a different output
+
+JWT_ACCESS_EXPIRES_IN=15m
+
+JWT_REFRESH_EXPIRES_IN=7d
+
+CLIENT_URL=http://localhost:5173
+
+PAYMENT_SECRET=run above again
+
+NODE_ENV=development
+
+```
+**3. Start the server**
 
 ```bash
 npm run dev
 ```
 
-The server runs on `http://localhost:5000`. Test the health check:
-
-```http
-GET /api/health
+Server runs on `http://localhost:5000`. Verify with:
 ```
 
+GET http://localhost:5000/api/health
 
+```
 
 ---
 
@@ -150,3 +277,4 @@ GET /api/health
 - Mongoose `select: false` to prevent password hash leaks
 
 **Live API:** https://newsletter-saas-api.onrender.com
+
