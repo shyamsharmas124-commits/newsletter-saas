@@ -1,3 +1,4 @@
+![API Status](https://img.shields.io/website?url=https://newsletter-saas-api.onrender.com/api/health)
 # Newsletter SaaS — Backend API
 
 A multi-tenant newsletter platform backend built with Node.js, Express, and MongoDB. Features JWT authentication with refresh token rotation, role-based access control (RBAC), and a payment verification flow.
