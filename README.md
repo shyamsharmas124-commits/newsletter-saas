@@ -1,4 +1,3 @@
-![API Status](https://img.shields.io/website?url=https://newsletter-saas-api.onrender.com/api/health)
 # Newsletter SaaS — Backend API
 
 A multi-tenant newsletter platform backend built with Node.js, Express, and MongoDB. Features JWT authentication with refresh token rotation, role-based access control (RBAC), and a payment verification flow.
@@ -11,7 +10,7 @@ A multi-tenant newsletter platform backend built with Node.js, Express, and Mong
 - **Framework:** Express.js
 - **Database:** MongoDB + Mongoose
 - **Auth:** JWT (access + refresh tokens), bcryptjs
-- **Payment:** Mock payment gateway with HMAC-SHA256 signature verification
+- **Payment:** Razorpay with HMAC-SHA256 signature verification
 
 ---
 
@@ -33,7 +32,8 @@ Payment verification uses HMAC-SHA256 signing — the server generates a signatu
 
 ## Project Structure
 
-server/
+```text
+.
 ├── config/
 │   └── db.js                 MongoDB connection
 ├── controllers/
@@ -55,6 +55,7 @@ server/
 │   ├── tokens.js             JWT generation and verification
 │   └── cookies.js            Refresh token cookie management
 └── server.js
+```
 
 
 ---
@@ -77,7 +78,7 @@ server/
 | GET | `/api/organizations/mine` | List my organizations | Logged in |
 | GET | `/api/organizations/:orgId` | Get organization | Subscriber |
 | GET | `/api/organizations/:orgId/members` | List members | Subscriber |
-| POST | `/api/organizations/:orgId/invite` | Invite a member | Editor |
+| POST | `/api/organizations/:orgId/invites` | Invite a member | Editor |
 | PATCH | `/api/organizations/:orgId/members/:userId/role` | Change member role | Owner |
 | DELETE | `/api/organizations/:orgId/members/:userId` | Remove member | Owner |
 
@@ -93,39 +94,46 @@ server/
 
 ## Local Setup
 
-**1. Clone and install**
+1. Clone and install
+
 ```bash
 git clone https://github.com/yourusername/newsletter-saas.git
 cd newsletter-saas/server
 npm install
 ```
 
-**2. Environment variables**
+2. Environment variables
+
 ```bash
 cp .env.example .env
 ```
+
 Fill in the following in `.env`:
 
-
+```env
 PORT=5000
 MONGO_URI=your_mongodb_atlas_uri
 JWT_ACCESS_SECRET=run: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-JWT_REFRESH_SECRET=run above again with a different output
+JWT_REFRESH_SECRET=run the same command again and keep the value different
 JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 CLIENT_URL=http://localhost:5173
-PAYMENT_SECRET=run above again
+RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+NODE_ENV=development
+```
 
+3. Start the server
 
-
-
-**3. Start the server**
 ```bash
 npm run dev
 ```
 
-Server runs on `http://localhost:5000`. Test the health check:
-GET http://localhost:5000/api/health
+The server runs on `http://localhost:5000`. Test the health check:
+
+```http
+GET /api/health
+```
 
 
 
@@ -139,7 +147,5 @@ GET http://localhost:5000/api/health
 - HMAC-SHA256 payment signature verification
 - Compound unique indexes for data integrity at the DB level
 - Mongoose `select: false` to prevent password hash leaks
-
-
 
 **Live API:** https://newsletter-saas-api.onrender.com
